@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>JSON → Markdown Templating Converter</title>
+
+        <link rel="stylesheet" href="https://fonts.xz.style/serve/inter.css" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@exampledev/new.css@1.1.2/new.min.css" />
+        <link rel="stylesheet" href="https://newcss.net/theme/night.css" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prism-themes@1.9.0/themes/prism-one-dark.min.css" />
+        <link rel="stylesheet" href="https://unpkg.com/codejar-linenumbers/js/codejar-linenumbers.css" />
+
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-markup.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-markup-templating.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-handlebars.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/handlebars@4.7.8/dist/handlebars.min.js"></script>
+        <script src="https://unpkg.com/codejar-linenumbers/js/codejar-linenumbers.min.js"></script>
+
+        <style>
+            :root {
+                --nc-lk-1: #2670b0;
+                --nc-lk-2: #4a90d0;
+                --danger: #c94d4d;
+                --danger-hover: #b63a3a;
+
+                --gray-dark: #1a1d23;
+                --gray-medium: #2a2d35;
+                --gray-light: #3a3d45;
+                --gray-lighter: rgba(255, 255, 255, 0.03);
+
+                --spacing: 0.5rem;
+            }
+
+            body {
+                max-width: 1400px;
+            }
+            .grid {
+                display: grid;
+                gap: calc(var(--spacing) * 2);
+                grid-template-columns: 1fr;
+            }
+            @media (min-width: 980px) {
+                .grid {
+                    grid-template-columns: 1fr 1fr;
+                }
+            }
+
+            .panel {
+                padding: calc(var(--spacing) * 2);
+                border: 1px solid var(--gray-light);
+                border-radius: var(--spacing);
+                background: var(--gray-lighter);
+                display: flex;
+                flex-direction: column;
+            }
+            .grid:not(:has(details[open])) .panel {
+                max-height: 35rem;
+            }
+            .panel h3 {
+                margin-top: 0;
+                flex-shrink: 0;
+            }
+            .panel > p,
+            .panel > details {
+                flex-shrink: 0;
+            }
+            .toolbar {
+                display: flex;
+                gap: var(--spacing);
+                flex-wrap: wrap;
+                align-items: center;
+                margin-top: var(--spacing);
+                flex-shrink: 0;
+            }
+            .toolbar-space {
+                flex: 1;
+            }
+            button.secondary {
+                background: transparent;
+                border: 1px solid var(--nc-lk-1);
+                color: var(--nc-lk-1);
+            }
+            button.secondary:hover {
+                background: var(--gray-medium);
+                border-color: var(--nc-lk-2);
+                color: var(--nc-lk-2);
+            }
+            button.danger {
+                background: var(--danger);
+                color: white;
+            }
+            button.danger:hover {
+                background: var(--danger-hover);
+            }
+
+            textarea,
+            pre,
+            code {
+                font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono",
+                    monospace;
+            }
+            textarea {
+                width: 100%;
+                flex: 1;
+                min-height: 12rem;
+                resize: vertical;
+                box-sizing: border-box;
+            }
+            .code-editor,
+            .codejar-wrap > div[contenteditable] {
+                width: 100%;
+                box-sizing: border-box;
+                border: 1px solid var(--gray-light);
+                border-radius: calc(var(--spacing) * 0.6);
+                padding: var(--spacing);
+                overflow: auto;
+                font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono",
+                    monospace;
+                font-size: 0.9rem;
+                line-height: 1.5;
+                background: var(--gray-dark);
+            }
+            .code-editor:focus,
+            .codejar-wrap > div[contenteditable]:focus {
+                outline: 2px solid var(--nc-lk-1);
+                outline-offset: 2px;
+            }
+
+            .codejar-wrap {
+                flex: 1;
+                min-height: 12rem;
+                margin-top: var(--spacing);
+                margin-bottom: var(--spacing);
+            }
+            .codejar-wrap > div[contenteditable] {
+                height: 100%;
+                margin: 0 !important;
+            }
+
+            .codejar-linenumber {
+                user-select: none;
+                text-align: right;
+                padding-right: var(--spacing);
+            }
+            pre {
+                min-height: 16rem;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+            .muted {
+                opacity: 0.7;
+            }
+            details ul {
+                font-size: 0.9rem;
+                font-weight: 400;
+            }
+            details summary {
+                font-size: 1.1em;
+                font-weight: 600;
+            }
+
+            dialog {
+                max-width: 50rem;
+                max-height: 80vh;
+                padding: calc(var(--spacing) * 4);
+                border: 1px solid var(--gray-light);
+                border-radius: var(--spacing);
+                background: var(--nc-bg-2);
+                color: var(--nc-tx-1);
+            }
+            dialog::backdrop {
+                background: rgba(0, 0, 0, 0.7);
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <header>
+                <h1>JSON → Markdown Templating Converter</h1>
+                <p>Transform your JSON data into formatted Markdown documents using simple templates.</p>
+            </header>
+
+            <section class="grid">
+                <div class="panel">
+                    <h3>Input JSON</h3>
+                    <div
+                        id="jsonIn"
+                        class="code-editor language-json"
+                        contenteditable="true"
+                        spellcheck="true"
+                        style="margin-top: var(--spacing-sm); margin-bottom: var(--spacing-sm)"></div>
+                    <div class="toolbar">
+                        <button id="pasteJson">Paste</button>
+                        <button id="prettyJson" class="secondary">Prettify</button>
+                        <small id="jsonStatus" class="muted"></small>
+                        <span class="toolbar-space"></span>
+                        <button id="clearJson" class="danger">Clear</button>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Your Template</h3>
+
+                    <p>
+                        <strong>Templating:</strong> Use <code>{{name}}</code> to insert values and
+                        <code>{{#each items}}...{{/each}}</code> to loop through arrays.
+                        <a href="https://handlebarsjs.com/guide/" target="_blank" rel="noopener">Handlebars docs</a>
+                    </p>
+                    <p>
+                        <strong>Markdown:</strong> Format text with <code># Heading</code>, <code>**bold**</code>,
+                        <code>[text](url)</code> for links, and more.
+                        <a href="https://www.markdownguide.org/basic-syntax/" target="_blank" rel="noopener"
+                            >Markdown docs</a
+                        >
+                    </p>
+
+                    <div
+                        id="tplIn"
+                        class="code-editor language-handlebars"
+                        contenteditable="true"
+                        spellcheck="true"
+                        style="margin-top: var(--spacing-sm); margin-bottom: var(--spacing-sm)"></div>
+
+                    <details style="margin-top: var(--spacing-sm)">
+                        <summary>More syntax examples</summary>
+                        <p style="margin: 0.5rem 0 0.25rem 0; font-weight: 600">Handlebars Template:</p>
+                        <ul style="margin-top: 0.25rem">
+                            <li><strong>Show if exists:</strong> <code>{{#if description}}...{{/if}}</code></li>
+                            <li><strong>Show if not:</strong> <code>{{#unless completed}}...{{/unless}}</code></li>
+                            <li><strong>Access nested data:</strong> <code>{{user.name}}</code></li>
+                            <li><strong>Access array item:</strong> <code>{{items.[0].title}}</code></li>
+                            <li><strong>Current item in loop:</strong> <code>{{this}}</code></li>
+                        </ul>
+                        <p style="margin: 1rem 0 0.25rem 0; font-weight: 600">Markdown:</p>
+                        <ul style="margin-top: 0.25rem">
+                            <li>
+                                <strong>Headings:</strong> <code># H1</code>, <code>## H2</code>, <code>### H3</code>,
+                                <code>#### H4</code>
+                            </li>
+                            <li><strong>Link:</strong> <code>[text](https://example.com)</code></li>
+                            <li>
+                                <strong>List item:</strong> <code>- item</code> or <code>* item</code> or
+                                <code>1. item</code>
+                            </li>
+                            <li><strong>Code inline:</strong> <code>`code`</code></li>
+                            <li><strong>Quote:</strong> <code>&gt; quote text</code></li>
+                        </ul>
+                    </details>
+
+                    <div class="toolbar">
+                        <button id="renderBtn">Render →</button>
+                        <small id="tplStatus" class="muted"></small>
+                        <span class="toolbar-space"></span>
+                        <button id="clearTpl" class="danger">Clear</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" style="margin-top: 1rem">
+                <h3>Output (Markdown)</h3>
+                <pre id="mdOut" aria-live="polite"></pre>
+                <div class="toolbar">
+                    <button id="copyOut">Copy Markdown</button>
+                    <small id="outMeta" class="muted"></small>
+                    <span class="toolbar-space"></span>
+                    <button id="clearOut" class="danger">Clear</button>
+                </div>
+            </section>
+        </main>
+
+        <script type="module">
+            import { CodeJar } from "https://medv.io/codejar/codejar.js";
+
+            const CONFIG = {
+                JSON_INDENT: 4,
+                TAB_SIZE: "    ",
+                COPIED_SUFFIX: " • Copied!",
+            };
+
+            const MESSAGES = {
+                PASTED: "Pasted from clipboard.",
+                PASTE_FAILED: "Paste failed. Use Ctrl+V instead.",
+                PRETTIFIED: "Prettified.",
+                RENDERED: "Rendered.",
+                CLEARED: "Cleared.",
+            };
+
+            const $ = (s) => document.querySelector(s);
+            const jsonInEl = $("#jsonIn");
+            const tplInEl = $("#tplIn");
+            const mdOut = $("#mdOut");
+            const jsonStatus = $("#jsonStatus");
+            const tplStatus = $("#tplStatus");
+            const outMeta = $("#outMeta");
+
+            const highlight = (editor) => {
+                const code = editor.textContent;
+                const language = editor.classList.contains("language-json") ? "json" : "handlebars";
+                editor.innerHTML = Prism.highlight(code, Prism.languages[language], language);
+            };
+
+            const editorOptions = {
+                tab: CONFIG.TAB_SIZE,
+                indentOn: /[(\[{]$/,
+                addClosing: true,
+                moveToNewLine: /^[}\])]$/,
+            };
+            const jsonEditor = CodeJar(jsonInEl, window.CodeJar.withLineNumbers(highlight), editorOptions);
+            const tplEditor = CodeJar(tplInEl, window.CodeJar.withLineNumbers(highlight), editorOptions);
+
+            const sampleJson = {
+                exported_at: "2025-10-01T12:34:56Z",
+                project_url: "https://app.asana.com/0/12345/board",
+                groups: [
+                    {
+                        group_name: "To Do",
+                        tasks: [
+                            {
+                                title: "Set up project",
+                                comments: [{ text: "Kickoff Friday." }, { text: "Add stakeholders." }],
+                            },
+                            { title: "Create repo", comments: [{ text: "Use MIT license." }] },
+                        ],
+                    },
+                    {
+                        group_name: "In Progress",
+                        tasks: [{ title: "Write docs", comments: [{ text: "Outline done." }] }],
+                    },
+                ],
+            };
+
+            const sampleTpl = `
+_Project URL:_ {{project_url}}
+_Exported at:_ {{exported_at}}
+
+{{#each groups}}
+## {{group_name}}
+
+{{#each tasks}}
+### {{title}}
+
+{{#if comments}}
+{{#each comments}}
+> {{text}}
+{{/each}}
+{{/if}}
+
+{{/each}}
+
+{{/each}}
+`.trim();
+
+            jsonEditor.updateCode(JSON.stringify(sampleJson, null, CONFIG.JSON_INDENT));
+            tplEditor.updateCode(sampleTpl);
+
+            function parseJson(text) {
+                try {
+                    return { success: true, data: JSON.parse(text || "{}") };
+                } catch (e) {
+                    return { success: false, error: e.message };
+                }
+            }
+
+            $("#pasteJson").addEventListener("click", async () => {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    jsonEditor.updateCode(text);
+                    jsonStatus.textContent = MESSAGES.PASTED;
+                } catch (e) {
+                    jsonStatus.textContent = MESSAGES.PASTE_FAILED;
+                }
+            });
+
+            $("#prettyJson").addEventListener("click", () => {
+                const result = parseJson(jsonEditor.toString());
+                if (result.success) {
+                    jsonEditor.updateCode(JSON.stringify(result.data, null, CONFIG.JSON_INDENT));
+                    jsonStatus.textContent = MESSAGES.PRETTIFIED;
+                } else {
+                    jsonStatus.textContent = "Parse error: " + result.error;
+                }
+            });
+
+            $("#renderBtn").addEventListener("click", () => {
+                const result = parseJson(jsonEditor.toString());
+                if (!result.success) {
+                    jsonStatus.textContent = "Parse error: " + result.error;
+                    return;
+                }
+
+                jsonStatus.textContent = "";
+                try {
+                    const compiled = Handlebars.compile(tplEditor.toString() || sampleTpl);
+                    const output = compiled(result.data);
+                    mdOut.textContent = output;
+                    outMeta.textContent = `${output.length} chars`;
+                    tplStatus.textContent = MESSAGES.RENDERED;
+                } catch (e) {
+                    tplStatus.textContent = "Template error: " + e.message;
+                }
+            });
+
+            $("#copyOut").addEventListener("click", async () => {
+                const text = mdOut.textContent;
+                if (!text) return;
+
+                try {
+                    await navigator.clipboard.writeText(text);
+                } catch {
+                    const textarea = document.createElement("textarea");
+                    textarea.value = text;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(textarea);
+                }
+                outMeta.textContent = outMeta.textContent.replace(/ • Copied!?/, "") + CONFIG.COPIED_SUFFIX;
+            });
+
+            $("#clearJson").addEventListener("click", () => {
+                jsonEditor.updateCode("");
+                jsonStatus.textContent = MESSAGES.CLEARED;
+            });
+
+            $("#clearTpl").addEventListener("click", () => {
+                tplEditor.updateCode("");
+                tplStatus.textContent = MESSAGES.CLEARED;
+            });
+
+            $("#clearOut").addEventListener("click", () => {
+                mdOut.textContent = "";
+                outMeta.textContent = MESSAGES.CLEARED;
+            });
+        </script>
+    </body>
+</html>
